@@ -53,10 +53,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import com.z3rotheone.blazer.Catalog
+import com.z3rotheone.blazer.Category
 import com.z3rotheone.blazer.IrTransmitter
-import com.z3rotheone.blazer.Key
-import com.z3rotheone.blazer.Profiles
-import com.z3rotheone.blazer.RemoteProfile
+import com.z3rotheone.blazer.ScanCandidate
 
 @Composable
 fun ScanScreen(
@@ -64,18 +67,22 @@ fun ScanScreen(
     onBack: () -> Unit,
     onSave: (name: String, profileId: String) -> Unit,
 ) {
+    var category by remember { mutableStateOf(Category.TV) }
     var brand by remember { mutableStateOf<String?>(null) }
     var index by remember { mutableIntStateOf(-1) } // -1 = not scanning
     var noMatch by remember { mutableStateOf(false) }
-    var matched by remember { mutableStateOf<RemoteProfile?>(null) }
+    var matched by remember { mutableStateOf<ScanCandidate?>(null) }
 
-    val candidates = remember(brand) { Profiles.all.filter { brand == null || it.brand == brand } }
+    // Skip code sets whose test signal is identical to one already tried (e.g. LG and Vizio power).
+    val candidates = remember(category, brand) {
+        val list = Catalog.candidates.filter { it.category == category && (brand == null || it.brand == brand) }
+        list.filterIndexed { i, c -> list.take(i).none { it.testSignal.sameAs(c.testSignal) } }
+    }
     val scanning = index >= 0
 
-    fun test(i: Int) {
-        val p = candidates[i]
-        p.keys[p.testKey]?.let { ir.send(it) }
-    }
+    fun reset() { index = -1; noMatch = false }
+
+    fun test(i: Int) = ir.send(candidates[i].testSignal)
 
     fun startScan() {
         noMatch = false
@@ -105,16 +112,43 @@ fun ScanScreen(
         }
 
         Spacer(Modifier.height(20.dp))
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .background(Palette.Surface, RoundedCornerShape(16.dp))
+                .padding(4.dp),
+        ) {
+            Category.entries.forEach { c ->
+                val selected = c == category
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .height(44.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (selected) Palette.SurfaceHi else Color.Transparent)
+                        .clickable { category = c; brand = null; reset() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        c.title,
+                        color = if (selected) Palette.Text else Palette.TextDim,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(20.dp))
         Text("Brand", color = Palette.TextDim, fontSize = 13.sp, modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(8.dp))
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            (listOf<String?>(null) + Profiles.brands).forEach { b ->
+            (listOf<String?>(null) + Catalog.brands(category)).forEach { b ->
                 FilterChip(
                     selected = brand == b,
-                    onClick = { brand = b; index = -1; noMatch = false },
+                    onClick = { brand = b; reset() },
                     label = { Text(b ?: "Any brand") },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = Palette.Accent,
@@ -131,7 +165,6 @@ fun ScanScreen(
         when {
             scanning -> {
                 val p = candidates[index]
-                val keyName = if (p.testKey == Key.POWER) "Power" else "Home"
                 Text(
                     "Code set ${index + 1} of ${candidates.size}",
                     color = Palette.Accent, fontWeight = FontWeight.SemiBold, fontSize = 14.sp,
@@ -140,7 +173,8 @@ fun ScanScreen(
                 Text(p.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "Sent $keyName. Did your device respond?",
+                    if (category == Category.AC) "Sent ${p.testLabel}. Did the unit beep or turn on?"
+                    else "Sent ${p.testLabel}. Did your device respond?",
                     color = Palette.TextDim, textAlign = TextAlign.Center,
                 )
                 Spacer(Modifier.height(24.dp))
@@ -168,6 +202,18 @@ fun ScanScreen(
                     color = Palette.TextDim, textAlign = TextAlign.Center,
                 )
             }
+            category == Category.AC -> {
+                Text(
+                    "Point the top of your phone at the indoor unit (or AC) and tap Scan. " +
+                        "Blazer sends \"on, cool, 24°C\" from each code set — tell it when the unit beeps or turns on.",
+                    color = Palette.TextDim, textAlign = TextAlign.Center,
+                )
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    "Tip: stand within a few feet of the unit for the best results.",
+                    color = Palette.TextDim.copy(alpha = 0.7f), fontSize = 13.sp, textAlign = TextAlign.Center,
+                )
+            }
             else -> {
                 Text(
                     "Point the top of your phone at your TV or streaming box and tap Scan. " +
@@ -185,14 +231,72 @@ fun ScanScreen(
     }
 
     matched?.let { p ->
-        NameDialog(
-            title = "Remote found",
-            initial = p.name,
-            confirmLabel = "Save",
+        // Brands that share this exact test signal (e.g. LG and Vizio) — let the user pick theirs.
+        val options = Catalog.candidates.filter { it.category == p.category && it.testSignal.sameAs(p.testSignal) }
+        SaveDialog(
+            options = options,
+            initial = p,
             onDismiss = { matched = null },
-            onConfirm = { name -> matched = null; onSave(name, p.id) },
+            onConfirm = { name, id -> matched = null; onSave(name, id) },
         )
     }
+}
+
+@Composable
+private fun SaveDialog(
+    options: List<ScanCandidate>,
+    initial: ScanCandidate,
+    onDismiss: () -> Unit,
+    onConfirm: (name: String, profileId: String) -> Unit,
+) {
+    var choice by remember { mutableStateOf(initial) }
+    var text by remember { mutableStateOf(initial.name) }
+    var edited by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Palette.Surface,
+        title = { Text("Remote found") },
+        text = {
+            Column {
+                if (options.size > 1) {
+                    Text("This code works for several brands. Which is yours?", color = Palette.TextDim, fontSize = 14.sp)
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        options.forEach { o ->
+                            FilterChip(
+                                selected = choice.id == o.id,
+                                onClick = { choice = o; if (!edited) text = o.name },
+                                label = { Text(o.brand) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = Palette.Accent,
+                                    selectedLabelColor = Palette.Bg,
+                                ),
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                }
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it; edited = true },
+                    label = { Text("Name") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = text.isNotBlank(), onClick = { onConfirm(text.trim(), choice.id) }) {
+                Text("Save", color = Palette.Accent)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel", color = Palette.TextDim) }
+        },
+    )
 }
 
 @Composable

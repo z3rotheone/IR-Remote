@@ -14,6 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.z3rotheone.blazer.ui.AcScreen
 import com.z3rotheone.blazer.ui.BlazerTheme
 import com.z3rotheone.blazer.ui.HomeScreen
 import com.z3rotheone.blazer.ui.RemoteScreen
@@ -89,9 +90,12 @@ private fun BlazerApp(ir: IrTransmitter, store: RemoteStore) {
             )
             is Screen.Remote -> {
                 val remote = remotes.firstOrNull { it.id == s.id }
-                val profile = remote?.let { Profiles.byId(it.profileId) }
-                if (remote != null && profile != null) {
-                    RemoteScreen(remote, profile, ir, onBack = { goHome() })
+                val tv = remote?.let { Profiles.byId(it.profileId) }
+                val ac = remote?.let { AcProfiles.byId(it.profileId) }
+                if (remote != null && tv != null) {
+                    RemoteScreen(remote, tv, ir, onBack = { goHome() })
+                } else if (remote != null && ac != null) {
+                    AcScreen(remote, ac, ir, store, onBack = { goHome() })
                 } else {
                     LaunchedEffect(s) { goHome() }
                 }

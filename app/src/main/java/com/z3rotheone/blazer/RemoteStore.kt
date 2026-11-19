@@ -18,7 +18,7 @@ class RemoteStore(context: Context) {
             (0 until arr.length()).map {
                 val o = arr.getJSONObject(it)
                 SavedRemote(o.getString("id"), o.getString("name"), o.getString("profile"))
-            }.filter { Profiles.byId(it.profileId) != null }
+            }.filter { Catalog.isKnown(it.profileId) }
         }.getOrDefault(emptyList())
     }
 
@@ -36,4 +36,28 @@ class RemoteStore(context: Context) {
     var lastOpened: String?
         get() = prefs.getString("last", null)
         set(value) = prefs.edit().putString("last", value).apply()
+
+    /** Last state sent to an air conditioner remote. */
+    fun loadAc(remoteId: String): AcState {
+        val raw = prefs.getString("ac_$remoteId", null) ?: return AcState()
+        return runCatching {
+            val o = JSONObject(raw)
+            AcState(
+                power = o.getBoolean("power"),
+                mode = AcMode.valueOf(o.getString("mode")),
+                temp = o.getInt("temp"),
+                fan = AcFan.valueOf(o.getString("fan")),
+            )
+        }.getOrDefault(AcState())
+    }
+
+    fun saveAc(remoteId: String, s: AcState) {
+        val o = JSONObject().put("power", s.power).put("mode", s.mode.name)
+            .put("temp", s.temp).put("fan", s.fan.name)
+        prefs.edit().putString("ac_$remoteId", o.toString()).apply()
+    }
+
+    var useFahrenheit: Boolean
+        get() = prefs.getBoolean("fahrenheit", true)
+        set(value) = prefs.edit().putBoolean("fahrenheit", value).apply()
 }

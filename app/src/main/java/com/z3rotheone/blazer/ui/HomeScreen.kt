@@ -47,7 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.z3rotheone.blazer.Profiles
+import com.z3rotheone.blazer.Catalog
 import com.z3rotheone.blazer.SavedRemote
 
 @Composable
@@ -153,7 +153,7 @@ private fun EmptyState(onAdd: () -> Unit) {
         Text("No remotes yet", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(6.dp))
         Text(
-            "Scan to find the right codes for your TV or streaming box.",
+            "Scan to find the right codes for your TV, streaming box or air conditioner.",
             color = Palette.TextDim, textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(28.dp))
@@ -176,7 +176,7 @@ private fun RemoteCard(
     onRename: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    val profile = Profiles.byId(remote.profileId)
+    val profile = Catalog.byId(remote.profileId)
     var menu by remember { mutableStateOf(false) }
     Row(
         Modifier
