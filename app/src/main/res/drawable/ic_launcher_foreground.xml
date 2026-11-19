@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- IR beams -->
+    <path
+        android:pathData="M45,35 Q54,29 63,35"
+        android:strokeColor="#FF8A3D"
+        android:strokeWidth="3"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M40,29.5 Q54,20 68,29.5"
+        android:strokeColor="#FFC24D"
+        android:strokeWidth="3"
+        android:strokeLineCap="round" />
+    <!-- Remote body -->
+    <path
+        android:fillColor="#FF8A3D"
+        android:pathData="M47,41 h14 a5,5 0 0 1 5,5 v31 a5,5 0 0 1 -5,5 h-14 a5,5 0 0 1 -5,-5 v-31 a5,5 0 0 1 5,-5 z" />
+    <!-- Power dot -->
+    <path
+        android:fillColor="#0D0E12"
+        android:pathData="M50.5,49 a3.5,3.5 0 1,0 7,0 a3.5,3.5 0 1,0 -7,0" />
+    <!-- Buttons -->
+    <path
+        android:fillColor="#0D0E12"
+        android:pathData="M48,58 h4 v4 h-4 z M56,58 h4 v4 h-4 z M48,66 h4 v4 h-4 z M56,66 h4 v4 h-4 z" />
+</vector>
